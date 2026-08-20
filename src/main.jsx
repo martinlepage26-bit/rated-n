@@ -1,0 +1,45 @@
+import { useState } from 'react'
+import { createRoot } from 'react-dom/client'
+import './styles.css'
+import './overrides.css'
+
+const roles = [
+  { title: 'Program Manager', match: 91, type: 'Direct', note: 'You already coordinate cross-functional work and lead operational delivery.', color: 'ink' },
+  { title: 'Implementation Manager', match: 87, type: 'Direct', note: 'Client coordination, training, and escalation work transfer strongly.', color: 'coral' },
+  { title: 'Research Operations Manager', match: 79, type: 'Unexpected', note: 'Your research, systems thinking, and people skills form a credible fit.', color: 'moss' },
+  { title: 'AI Operations Specialist', match: 76, type: 'Unexpected', note: 'Process design and evidence evaluation are a powerful foundation here.', color: 'sand' },
+]
+
+function App() {
+  const [view, setView] = useState('home')
+  const [profile, setProfile] = useState(false)
+  const [profileText, setProfileText] = useState('')
+  const [selected, setSelected] = useState(roles[1])
+  const [toast, setToast] = useState('')
+  const notify = (message) => { setToast(message); setTimeout(() => setToast(''), 2600) }
+
+  if (view === 'results') return <Results selected={selected} setSelected={setSelected} setView={setView} profile={profile} notify={notify} toast={toast} />
+  if (view === 'detail') return <Detail role={selected} setView={setView} notify={notify} toast={toast} />
+  return <Home profile={profile} setProfile={setProfile} profileText={profileText} setProfileText={setProfileText} setView={setView} notify={notify} toast={toast} />
+}
+
+const Header = ({ setView }) => <header><button className="wordmark" onClick={() => setView('home')}>Rated <i>N</i></button><nav><button onClick={() => setView('home')}>How it works</button><button onClick={() => setView('home')}>Sign in</button><button className="nav-cta" onClick={() => setView('home')}>Get started</button></nav></header>
+const Toast = ({ toast }) => toast && <div className="toast">{toast}</div>
+
+function Home({ profile, setProfile, profileText, setProfileText, setView, notify, toast }) {
+  const addResume = () => { setProfile(true); notify('Your profile is ready for discovery.') }
+  return <main><Header setView={setView} /><section className="hero">
+    <div className="hero-copy"><p className="kicker">Your career, seen differently</p><h1>Discover what you’re qualified <em>to become.</em></h1><p className="lede">Rated N turns the experience you’ve accumulated into credible career paths you may not know to search for.</p><div className="actions"><button className="primary" onClick={() => setView('results')}>Show my opportunities <b>→</b></button><button className="text-btn" onClick={() => notify('A guided profile interview would start here.')}>How it works</button></div></div>
+    <div className="hero-art"><img src="/career-map.png" alt="Abstract professional connections"/><div className="proof"><strong>1</strong><span>clearer map of what<br/>you can do next</span></div></div>
+  </section>
+  <section className="momentum"><div><p className="kicker">Your Professional DNA</p><h2>A fuller picture than a job title.</h2></div><div className="stats"><Stat value="1" label="career story"/><Stat value="∞" label="possible pathways"/><Stat value="0" label="assumptions made"/></div></section>
+  <section className="workspace"><div className="profile-panel"><div className="panel-top"><div><p className="eyebrow">Begin your discovery</p><h3>{profile ? 'Your experience is ready to explore.' : 'Tell us a little about what you have done.'}</h3></div><span className={profile ? 'status ready' : 'status'}>{profile ? 'Ready' : 'Private by default'}</span></div><p>{profile ? 'Your profile stays in this browser for this prototype. In the product, each finding will link to the evidence you provide.' : 'Paste a few roles, projects, courses, accomplishments, or skills. You can add a résumé in the full product.'}</p><label className="sr-only" htmlFor="profile-text">Your experience</label><textarea id="profile-text" value={profileText} onChange={e => setProfileText(e.target.value)} placeholder="Example: I managed a frontline team, trained new hires, organized complex schedules, and improved customer service..."/><div className="intake-actions"><button className="primary" onClick={() => { addResume(); setView('results') }} disabled={!profileText.trim()}>Find my paths <b>→</b></button><button className="text-btn" onClick={() => { setProfileText('Managed operations, trained staff, coordinated clients, and improved processes across a changing organization.'); notify('Demo experience added.'); }}>Use an example</button></div></div>
+    <div className="question-panel"><p className="eyebrow">The question that matters</p><h3>What could you become next?</h3><p>Explore roles based on demonstrated capability—not only the titles you have held.</p><button className="primary light" onClick={() => setView('results')}>Discover roles <b>→</b></button></div></section><Toast toast={toast}/></main>
+}
+const Stat = ({value,label}) => <div><strong>{value}</strong><span>{label}</span></div>
+
+function Results({ selected, setSelected, setView, profile, notify, toast }) { return <main><Header setView={setView}/><section className="results-head"><div><button className="back" onClick={() => setView('home')}>← Back to overview</button><p className="kicker">{profile ? 'Career discovery · based on your story' : 'Demo career discovery'}</p><h1>These paths fit more<br/>than your <em>past titles.</em></h1></div><aside><strong>{profile ? '18' : '4'}</strong><span>{profile ? 'transferable capabilities<br/>identified in your story' : 'sample opportunities<br/>to explore'}</span></aside></section><section className="filters"><button className="filter active">All opportunities</button><button className="filter">Direct</button><button className="filter">Adjacent</button><button className="filter">Unexpected</button><button className="filter">Stretch</button></section><section className="results-layout"><div className="role-list"><p className="list-label">{profile ? 'Opportunities ranked by fit' : 'Example opportunities — add your story for personal results'}</p>{roles.map(role => <button key={role.title} className={'role-card '+(selected.title === role.title ? 'selected' : '')} onClick={() => {setSelected(role); setView('detail')}}><span className={'match-dot '+role.color}>{role.match}</span><span className="role-copy"><small>{role.type}</small><strong>{role.title}</strong><em>{role.note}</em></span><b>→</b></button>)}</div><aside className="signal"><p className="eyebrow">A useful surprise</p><h2>Strong paths can exist outside your usual search.</h2><p>Transferable skills can open credible roles in industries that use your evidence differently.</p><button className="text-btn" onClick={() => setView('home')}>Add my experience →</button></aside></section><Toast toast={toast}/></main> }
+
+function Detail({ role, setView, notify, toast }) { const scoreRows=[['Experience evidence', 94],['Competencies', 88],['Skills & tools', 82],['Education & training', 73]]; return <main><Header setView={setView}/><section className="detail-hero"><button className="back" onClick={() => setView('results')}>← All opportunities</button><div className="role-heading"><div><p className="kicker">{role.type} opportunity</p><h1>{role.title}</h1><p>{role.note}</p></div><div className="big-score"><strong>{role.match}%</strong><span>credible match</span></div></div></section><section className="detail-grid"><article className="evidence"><p className="eyebrow">Why you qualify</p><h2>Your evidence carries.</h2><p>Across your experience, we found a recurring pattern of coordination, people development, clear communication, and process improvement.</p><div className="quote">“Managed weekly operations, trained new staff, resolved complex customer escalations, and prepared performance reports.”<small>Evidence from Operations Lead · 2022–2025</small></div><div className="chips"><span>Stakeholder management</span><span>Training & enablement</span><span>Operational coordination</span><span>Process improvement</span></div></article><aside className="scorecard"><p className="eyebrow">How this score was made</p>{scoreRows.map(([label, value])=><div className="score-row" key={label}><span>{label}</span><b>{value}%</b><i><i style={{width:value+'%'}}/></i></div>)}<button className="quiet-link" onClick={() => notify('Score methodology opened.')}>See methodology →</button></aside></section><section className="path"><div><p className="eyebrow">A realistic path</p><h2>Close two gaps. Build one proof point.</h2></div><ol><li><b>01</b><span>Learn the implementation lifecycle</span></li><li><b>02</b><span>Complete a practical Salesforce fundamentals project</span></li><li><b>03</b><span>Reframe existing evidence for transition roles</span></li></ol><button className="primary" onClick={() => notify('This role has been saved to your plan.')}>Save this path <b>→</b></button></section><Toast toast={toast}/></main> }
+
+createRoot(document.getElementById('root')).render(<App />)
