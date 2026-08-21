@@ -33,6 +33,19 @@ textarea {
 
 textarea:focus { border-color: var(--coral); box-shadow: 0 0 0 3px #e15a4222; }
 .intake-actions { display: flex; gap: 20px; align-items: center; margin-top: 18px; }
+.field-label { display: block; font-size: 12px; font-weight: 800; margin: 22px 0 8px; }
+.file-upload { font-size: 12px; font-weight: 800; text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
+.file-upload input { display: none; }
+.input-status { margin: 14px 0 0; color: var(--moss); font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.steps { list-style: none; margin: 30px 0; padding: 0; }
+.steps li { display: flex; gap: 12px; padding: 12px 0; border-top: 1px solid #ffffff35; font-size: 12px; }
+.steps b { color: #f2a698; font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.inverse { color: #fff; }
+.capability-strip { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 20px 8vw; border-bottom: 1px solid var(--line); }
+.capability-strip span { margin-right: 8px; color: var(--muted); font: 10px ui-monospace, SFMono-Regular, Menlo, monospace; text-transform: uppercase; letter-spacing: .08em; }
+.capability-strip b { border: 1px solid var(--line); border-radius: 99px; padding: 7px 9px; font-size: 11px; }
+.gap-title { margin: 30px 0 10px; font-size: 12px; font-weight: 800; }
+.gap { padding: 10px 0; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
 
 /* Keep the two halves of the opening statement visually connected. */
 @media (min-width: 768px) {
@@ -42,4 +55,5 @@ textarea:focus { border-color: var(--coral); box-shadow: 0 0 0 3px #e15a4222; }
 
 @media (max-width: 767px) {
   .intake-actions { align-items: flex-start; flex-direction: column; }
+  .capability-strip { padding: 18px 7vw; }
 }

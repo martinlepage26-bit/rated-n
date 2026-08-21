@@ -3,43 +3,80 @@ import { createRoot } from 'react-dom/client'
 import './styles.css'
 import './overrides.css'
 
-const roles = [
-  { title: 'Program Manager', match: 91, type: 'Direct', note: 'You already coordinate cross-functional work and lead operational delivery.', color: 'ink' },
-  { title: 'Implementation Manager', match: 87, type: 'Direct', note: 'Client coordination, training, and escalation work transfer strongly.', color: 'coral' },
-  { title: 'Research Operations Manager', match: 79, type: 'Unexpected', note: 'Your research, systems thinking, and people skills form a credible fit.', color: 'moss' },
-  { title: 'AI Operations Specialist', match: 76, type: 'Unexpected', note: 'Process design and evidence evaluation are a powerful foundation here.', color: 'sand' },
+const capabilityMap = {
+  leadership: ['managed', 'supervised', 'led', 'leadership', 'team lead'],
+  operations: ['operations', 'schedule', 'scheduling', 'workflow', 'logistics', 'process'],
+  training: ['trained', 'training', 'coaching', 'onboarded', 'mentored'],
+  clients: ['customer', 'client', 'stakeholder', 'account', 'escalation'],
+  projects: ['project', 'program', 'roadmap', 'delivery', 'coordinated'],
+  analysis: ['analysis', 'research', 'report', 'data', 'insight', 'evaluation'],
+  communication: ['communication', 'presented', 'writing', 'wrote', 'facilitated'],
+  technology: ['software', 'crm', 'salesforce', 'ai', 'automation', 'technical'],
+  improvement: ['improved', 'optimization', 'streamlined', 'efficient', 'redesigned'],
+}
+
+const roleCatalog = [
+  { title: 'Program Manager', category: 'Direct', needs: ['projects', 'leadership', 'communication', 'operations'], gaps: ['portfolio governance', 'budget ownership'] },
+  { title: 'Implementation Manager', category: 'Direct', needs: ['clients', 'training', 'projects', 'technology'], gaps: ['implementation methodology', 'platform expertise'] },
+  { title: 'Operations Manager', category: 'Direct', needs: ['operations', 'leadership', 'improvement', 'analysis'], gaps: ['financial planning', 'department strategy'] },
+  { title: 'Business Analyst', category: 'Adjacent', needs: ['analysis', 'communication', 'improvement', 'technology'], gaps: ['requirements documentation', 'analytics tooling'] },
+  { title: 'Research Operations Manager', category: 'Unexpected', needs: ['analysis', 'operations', 'projects', 'communication'], gaps: ['research governance', 'study operations'] },
+  { title: 'Customer Success Manager', category: 'Adjacent', needs: ['clients', 'communication', 'training', 'technology'], gaps: ['success metrics', 'renewal strategy'] },
+  { title: 'AI Operations Specialist', category: 'Unexpected', needs: ['technology', 'operations', 'analysis', 'improvement'], gaps: ['AI workflow design', 'model evaluation'] },
 ]
+
+function analyze(text) {
+  const source = text.toLowerCase()
+  const sentences = text.split(/(?<=[.!?])\s+|\n+/).map(item => item.trim()).filter(Boolean)
+  const capabilities = Object.entries(capabilityMap).flatMap(([name, terms]) => {
+    const term = terms.find(item => source.includes(item))
+    if (!term) return []
+    const evidence = sentences.find(sentence => sentence.toLowerCase().includes(term)) || `You mentioned ${term}.`
+    return [{ name, label: name.replace(/^./, name[0].toUpperCase()), evidence }]
+  })
+  const found = new Set(capabilities.map(item => item.name))
+  const roles = roleCatalog.map(role => {
+    const matched = role.needs.filter(need => found.has(need))
+    const missing = role.needs.filter(need => !found.has(need))
+    const score = Math.min(96, Math.max(32, Math.round(30 + (matched.length / role.needs.length) * 62 + Math.min(text.length / 80, 4))))
+    const category = score >= 76 ? role.category : score >= 56 ? 'Adjacent' : 'Stretch'
+    return { ...role, category, score, matched, missing, evidence: capabilities.filter(item => matched.includes(item.name)) }
+  }).sort((a, b) => b.score - a.score)
+  return { capabilities, roles }
+}
 
 function App() {
   const [view, setView] = useState('home')
-  const [profile, setProfile] = useState(false)
-  const [profileText, setProfileText] = useState('')
-  const [selected, setSelected] = useState(roles[1])
+  const [source, setSource] = useState('')
+  const [analysis, setAnalysis] = useState(null)
+  const [selected, setSelected] = useState(null)
   const [toast, setToast] = useState('')
-  const notify = (message) => { setToast(message); setTimeout(() => setToast(''), 2600) }
-
-  if (view === 'results') return <Results selected={selected} setSelected={setSelected} setView={setView} profile={profile} notify={notify} toast={toast} />
-  if (view === 'detail') return <Detail role={selected} setView={setView} notify={notify} toast={toast} />
-  return <Home profile={profile} setProfile={setProfile} profileText={profileText} setProfileText={setProfileText} setView={setView} notify={notify} toast={toast} />
+  const notify = message => { setToast(message); window.setTimeout(() => setToast(''), 2600) }
+  const discover = () => { const result = analyze(source); setAnalysis(result); setSelected(result.roles[0]); setView('results') }
+  const loadFile = event => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    if (!file.name.endsWith('.txt')) { notify('For this local MVP, paste PDF or DOCX content into the text box. Plain-text files work directly.'); return }
+    const reader = new FileReader()
+    reader.onload = () => { setSource(String(reader.result || '')); notify(`${file.name} loaded.`) }
+    reader.readAsText(file)
+  }
+  const props = { setView, toast, notify }
+  if (view === 'results' && analysis) return <Results {...props} analysis={analysis} selected={selected} setSelected={setSelected} />
+  if (view === 'detail' && selected) return <Detail {...props} role={selected} />
+  return <Home {...props} source={source} setSource={setSource} discover={discover} loadFile={loadFile} />
 }
 
 const Header = ({ setView }) => <header><button className="wordmark" onClick={() => setView('home')}>Rated <i>N</i></button><nav><button onClick={() => setView('home')}>How it works</button><button onClick={() => setView('home')}>Sign in</button><button className="nav-cta" onClick={() => setView('home')}>Get started</button></nav></header>
-const Toast = ({ toast }) => toast && <div className="toast">{toast}</div>
+const Toast = ({ toast }) => toast && <div className="toast" role="status">{toast}</div>
 
-function Home({ profile, setProfile, profileText, setProfileText, setView, notify, toast }) {
-  const addResume = () => { setProfile(true); notify('Your profile is ready for discovery.') }
-  return <main><Header setView={setView} /><section className="hero">
-    <div className="hero-copy"><p className="kicker">Your career, seen differently</p><h1>Discover what you’re qualified <em>to become.</em></h1><p className="lede">Rated N turns the experience you’ve accumulated into credible career paths you may not know to search for.</p><div className="actions"><button className="primary" onClick={() => setView('results')}>Show my opportunities <b>→</b></button><button className="text-btn" onClick={() => notify('A guided profile interview would start here.')}>How it works</button></div></div>
-    <div className="hero-art"><img src="/career-map.png" alt="Abstract professional connections"/><div className="proof"><strong>1</strong><span>clearer map of what<br/>you can do next</span></div></div>
-  </section>
-  <section className="momentum"><div><p className="kicker">Your Professional DNA</p><h2>A fuller picture than a job title.</h2></div><div className="stats"><Stat value="1" label="career story"/><Stat value="∞" label="possible pathways"/><Stat value="0" label="assumptions made"/></div></section>
-  <section className="workspace"><div className="profile-panel"><div className="panel-top"><div><p className="eyebrow">Begin your discovery</p><h3>{profile ? 'Your experience is ready to explore.' : 'Tell us a little about what you have done.'}</h3></div><span className={profile ? 'status ready' : 'status'}>{profile ? 'Ready' : 'Private by default'}</span></div><p>{profile ? 'Your profile stays in this browser for this prototype. In the product, each finding will link to the evidence you provide.' : 'Paste a few roles, projects, courses, accomplishments, or skills. You can add a résumé in the full product.'}</p><label className="sr-only" htmlFor="profile-text">Your experience</label><textarea id="profile-text" value={profileText} onChange={e => setProfileText(e.target.value)} placeholder="Example: I managed a frontline team, trained new hires, organized complex schedules, and improved customer service..."/><div className="intake-actions"><button className="primary" onClick={() => { addResume(); setView('results') }} disabled={!profileText.trim()}>Find my paths <b>→</b></button><button className="text-btn" onClick={() => { setProfileText('Managed operations, trained staff, coordinated clients, and improved processes across a changing organization.'); notify('Demo experience added.'); }}>Use an example</button></div></div>
-    <div className="question-panel"><p className="eyebrow">The question that matters</p><h3>What could you become next?</h3><p>Explore roles based on demonstrated capability—not only the titles you have held.</p><button className="primary light" onClick={() => setView('results')}>Discover roles <b>→</b></button></div></section><Toast toast={toast}/></main>
+function Home({ source, setSource, discover, loadFile, setView, toast, notify }) {
+  const example = 'Managed a frontline team of 12 employees, scheduled weekly operations, trained new hires, resolved customer escalations, prepared performance reports, and improved an intake process.'
+  return <main><Header setView={setView}/><section className="hero"><div className="hero-copy"><p className="kicker">Your career, seen differently</p><h1>Discover what you’re qualified <em>to become.</em></h1><p className="lede">Add your experience. Rated N extracts demonstrated capabilities and maps them to credible career paths.</p></div><div className="hero-art"><img src="/career-map.png" alt="Abstract professional connections"/><div className="proof"><strong>1</strong><span>clearer map of what<br/>you can do next</span></div></div></section><section className="workspace functional"><div className="profile-panel"><div className="panel-top"><div><p className="eyebrow">Start your discovery</p><h3>What have you actually done?</h3></div><span className="status">Private in this browser</span></div><p>Paste experience from a résumé, LinkedIn profile, project history, or career notes. Your text is analyzed locally in this prototype and is not uploaded.</p><label className="field-label" htmlFor="profile-text">Your experience</label><textarea id="profile-text" value={source} onChange={event => setSource(event.target.value)} placeholder="Example: I managed a team, trained colleagues, coordinated projects, worked with clients, and improved operational processes..."/><div className="intake-actions"><button className="primary" onClick={discover} disabled={source.trim().length < 40}>Analyze my experience <b>→</b></button><button className="text-btn" onClick={() => setSource(example)}>Use an example</button><label className="file-upload">Upload .txt<input type="file" accept="text/plain,.txt" onChange={loadFile}/></label></div>{source.trim() && <p className="input-status">{source.trim().split(/\s+/).length} words ready to analyze</p>}</div><div className="question-panel"><p className="eyebrow">How it works</p><h3>Evidence, then opportunity.</h3><ol className="steps"><li><b>01</b><span>Extract capabilities from your words</span></li><li><b>02</b><span>Compare them to role requirements</span></li><li><b>03</b><span>Show your strongest evidence and gaps</span></li></ol><button className="text-btn inverse" onClick={() => notify('Enter at least 40 characters to begin your analysis.')}>What happens to my data? →</button></div></section><Toast toast={toast}/></main>
 }
-const Stat = ({value,label}) => <div><strong>{value}</strong><span>{label}</span></div>
 
-function Results({ selected, setSelected, setView, profile, notify, toast }) { return <main><Header setView={setView}/><section className="results-head"><div><button className="back" onClick={() => setView('home')}>← Back to overview</button><p className="kicker">{profile ? 'Career discovery · based on your story' : 'Demo career discovery'}</p><h1>These paths fit more<br/>than your <em>past titles.</em></h1></div><aside><strong>{profile ? '18' : '4'}</strong><span>{profile ? 'transferable capabilities<br/>identified in your story' : 'sample opportunities<br/>to explore'}</span></aside></section><section className="filters"><button className="filter active">All opportunities</button><button className="filter">Direct</button><button className="filter">Adjacent</button><button className="filter">Unexpected</button><button className="filter">Stretch</button></section><section className="results-layout"><div className="role-list"><p className="list-label">{profile ? 'Opportunities ranked by fit' : 'Example opportunities — add your story for personal results'}</p>{roles.map(role => <button key={role.title} className={'role-card '+(selected.title === role.title ? 'selected' : '')} onClick={() => {setSelected(role); setView('detail')}}><span className={'match-dot '+role.color}>{role.match}</span><span className="role-copy"><small>{role.type}</small><strong>{role.title}</strong><em>{role.note}</em></span><b>→</b></button>)}</div><aside className="signal"><p className="eyebrow">A useful surprise</p><h2>Strong paths can exist outside your usual search.</h2><p>Transferable skills can open credible roles in industries that use your evidence differently.</p><button className="text-btn" onClick={() => setView('home')}>Add my experience →</button></aside></section><Toast toast={toast}/></main> }
+function Results({ analysis, selected, setSelected, setView, toast, notify }) { return <main><Header setView={setView}/><section className="results-head"><div><button className="back" onClick={() => setView('home')}>← Edit experience</button><p className="kicker">Career discovery · your local analysis</p><h1>These paths fit more<br/>than your <em>past titles.</em></h1></div><aside><strong>{analysis.capabilities.length}</strong><span>capabilities found<br/>in your career story</span></aside></section><section className="capability-strip"><span>Found in your text</span>{analysis.capabilities.map(item => <b key={item.name}>{item.label}</b>)}</section><section className="results-layout"><div className="role-list"><p className="list-label">Opportunities ranked by demonstrated overlap</p>{analysis.roles.map(role => <button key={role.title} className={'role-card '+(selected?.title === role.title ? 'selected' : '')} onClick={() => { setSelected(role); setView('detail') }}><span className={'match-dot '+(role.category === 'Unexpected' ? 'moss' : role.category === 'Adjacent' ? 'sand' : 'coral')}>{role.score}</span><span className="role-copy"><small>{role.category}</small><strong>{role.title}</strong><em>{role.matched.length} of {role.needs.length} core capability areas demonstrated</em></span><b>→</b></button>)}</div><aside className="signal"><p className="eyebrow">How to read this</p><h2>Scores reflect overlap—not a hiring guarantee.</h2><p>A score is calculated from capability evidence in the text you provided. Open a role to see the exact evidence and the gaps.</p><button className="text-btn" onClick={() => notify('Every score in this prototype is calculated from the current text only.')}>See scoring logic →</button></aside></section><Toast toast={toast}/></main> }
 
-function Detail({ role, setView, notify, toast }) { const scoreRows=[['Experience evidence', 94],['Competencies', 88],['Skills & tools', 82],['Education & training', 73]]; return <main><Header setView={setView}/><section className="detail-hero"><button className="back" onClick={() => setView('results')}>← All opportunities</button><div className="role-heading"><div><p className="kicker">{role.type} opportunity</p><h1>{role.title}</h1><p>{role.note}</p></div><div className="big-score"><strong>{role.match}%</strong><span>credible match</span></div></div></section><section className="detail-grid"><article className="evidence"><p className="eyebrow">Why you qualify</p><h2>Your evidence carries.</h2><p>Across your experience, we found a recurring pattern of coordination, people development, clear communication, and process improvement.</p><div className="quote">“Managed weekly operations, trained new staff, resolved complex customer escalations, and prepared performance reports.”<small>Evidence from Operations Lead · 2022–2025</small></div><div className="chips"><span>Stakeholder management</span><span>Training & enablement</span><span>Operational coordination</span><span>Process improvement</span></div></article><aside className="scorecard"><p className="eyebrow">How this score was made</p>{scoreRows.map(([label, value])=><div className="score-row" key={label}><span>{label}</span><b>{value}%</b><i><i style={{width:value+'%'}}/></i></div>)}<button className="quiet-link" onClick={() => notify('Score methodology opened.')}>See methodology →</button></aside></section><section className="path"><div><p className="eyebrow">A realistic path</p><h2>Close two gaps. Build one proof point.</h2></div><ol><li><b>01</b><span>Learn the implementation lifecycle</span></li><li><b>02</b><span>Complete a practical Salesforce fundamentals project</span></li><li><b>03</b><span>Reframe existing evidence for transition roles</span></li></ol><button className="primary" onClick={() => notify('This role has been saved to your plan.')}>Save this path <b>→</b></button></section><Toast toast={toast}/></main> }
+function Detail({ role, setView, toast, notify }) { return <main><Header setView={setView}/><section className="detail-hero"><button className="back" onClick={() => setView('results')}>← All opportunities</button><div className="role-heading"><div><p className="kicker">{role.category} opportunity</p><h1>{role.title}</h1><p>{role.matched.length} of {role.needs.length} core capabilities for this path were found in your provided experience.</p></div><div className="big-score"><strong>{role.score}%</strong><span>evidence overlap</span></div></div></section><section className="detail-grid"><article className="evidence"><p className="eyebrow">Your supporting evidence</p><h2>We only use what you gave us.</h2>{role.evidence.length ? role.evidence.map(item => <div className="quote" key={item.name}>“{item.evidence}”<small>Matched capability · {item.label}</small></div>) : <p>No direct evidence was found for this role yet. Add more concrete accomplishments and tools to improve the analysis.</p>}<div className="chips">{role.matched.map(item => <span key={item}>{item}</span>)}</div></article><aside className="scorecard"><p className="eyebrow">Match detail</p><div className="score-row"><span>Demonstrated areas</span><b>{role.matched.length}/{role.needs.length}</b><i><i style={{width:(role.matched.length / role.needs.length) * 100+'%'}}/></i></div><div className="score-row"><span>Evidence overlap</span><b>{role.score}%</b><i><i style={{width:role.score+'%'}}/></i></div><p className="gap-title">Next gaps to close</p>{role.gaps.map(gap => <div className="gap" key={gap}>{gap}</div>)}</aside></section><section className="path"><div><p className="eyebrow">A realistic next step</p><h2>Turn your evidence into a transition plan.</h2></div><ol><li><b>01</b><span>Review the highlighted evidence for accuracy</span></li><li><b>02</b><span>Build one practical proof point around {role.gaps[0]}</span></li><li><b>03</b><span>Position your experience for {role.title} opportunities</span></li></ol><button className="primary" onClick={() => notify('Saved locally for this session.')}>Save this path <b>→</b></button></section><Toast toast={toast}/></main> }
 
 createRoot(document.getElementById('root')).render(<App />)
