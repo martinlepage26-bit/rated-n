@@ -3,7 +3,8 @@ import type { Env, UserRow } from './types';
 
 const encoder = new TextEncoder();
 const SESSION_COOKIE = 'rated_n_session';
-const PASSWORD_ITERATIONS = 120_000;
+// Cloudflare Workers enforces a maximum PBKDF2 iteration count of 100,000.
+const PASSWORD_ITERATIONS = 100_000;
 
 function bytesToBase64Url(bytes: Uint8Array): string {
   let binary = '';
