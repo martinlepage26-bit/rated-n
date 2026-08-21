@@ -34,6 +34,12 @@ textarea {
 textarea:focus { border-color: var(--coral); box-shadow: 0 0 0 3px #e15a4222; }
 .intake-actions { display: flex; gap: 20px; align-items: center; margin-top: 18px; }
 
+/* Keep the two halves of the opening statement visually connected. */
+@media (min-width: 768px) {
+  .hero { grid-template-columns: 1fr 1fr; }
+  .hero-copy { padding-right: 4.5vw; }
+}
+
 @media (max-width: 767px) {
   .intake-actions { align-items: flex-start; flex-direction: column; }
 }
