@@ -1,0 +1,23 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "rated-n-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-21",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  "ai": { "binding": "AI" },
+  "browser": { "binding": "BROWSER" },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "rated-n-db",
+      "database_id": "7a7eb5dd-ae8f-41e7-bbc9-30c8918f8abd",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "vars": {
+    "APP_ORIGIN": "https://rated-n.pages.dev",
+    "AI_MODEL": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+    "SESSION_DAYS": "30"
+  }
+}

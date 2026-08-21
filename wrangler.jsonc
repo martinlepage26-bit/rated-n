@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "rated-n",
+  "pages_build_output_dir": "dist",
+  "compatibility_date": "2026-08-21",
+  "services": [
+    {
+      "binding": "RATED_N_API",
+      "service": "rated-n-api"
+    }
+  ]
+}

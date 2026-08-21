@@ -5,3 +5,7 @@ dist/
 .env.*
 !.env.example
 npm-debug.log*
+test-results/
+playwright-report/
+.dev.vars
+worker/.dev.vars
