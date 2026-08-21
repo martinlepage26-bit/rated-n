@@ -19,7 +19,10 @@ export default {
         return json({ ok: true, service: 'rated-n-api' }, 200, { 'Cache-Control': 'public, max-age=30' });
       }
       if (request.method === 'GET' && path === '/config') {
-        return json({ google_auth_enabled: Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET), email_delivery_enabled: Boolean(env.EMAIL && env.EMAIL_FROM) });
+        return json({
+          google_auth_enabled: Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET),
+          email_delivery_enabled: Boolean((env.EMAIL && env.EMAIL_FROM) || (env.RESEND_API_KEY && env.RESEND_FROM))
+        });
       }
       if (path.startsWith('/auth/')) return await handleAuth(request, url, path, env);
       if (path.startsWith('/profiles') || path.startsWith('/roles') || path === '/dashboard') return await handleProfiles(request, path, env);

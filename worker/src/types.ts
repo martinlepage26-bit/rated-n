@@ -31,6 +31,8 @@ export interface Env {
   AI_MODEL?: string;
   SESSION_DAYS?: string;
   EMAIL_FROM?: string;
+  RESEND_API_KEY?: string;
+  RESEND_FROM?: string;
   AUTH_PEPPER?: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;

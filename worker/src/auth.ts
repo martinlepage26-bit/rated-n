@@ -30,22 +30,44 @@ function clientKey(request: Request): string {
 }
 
 async function sendTextEmail(env: Env, to: string, subject: string, body: string): Promise<void> {
-  if (!env.EMAIL || !env.EMAIL_FROM) throw new ApiProblem(503, 'email_unavailable', 'Email delivery is not configured yet.');
-  const fromAddress = env.EMAIL_FROM.match(/<([^>]+)>/u)?.[1] || env.EMAIL_FROM;
-  const messageIdDomain = fromAddress.split('@')[1];
-  const raw = [
-    `From: ${env.EMAIL_FROM}`,
-    `To: ${to}`,
-    `Subject: ${subject}`,
-    `Date: ${new Date().toUTCString()}`,
-    `Message-ID: <${crypto.randomUUID()}@${messageIdDomain}>`,
-    'MIME-Version: 1.0',
-    'Content-Type: text/plain; charset=UTF-8',
-    'Content-Transfer-Encoding: 8bit',
-    '',
-    body
-  ].join('\r\n');
-  await env.EMAIL.send(new EmailMessage(fromAddress, to, raw));
+  const bindingFrom = env.EMAIL_FROM;
+  const resendFrom = env.RESEND_FROM;
+  if (env.EMAIL && bindingFrom) {
+    const fromAddress = bindingFrom.match(/<([^>]+)>/u)?.[1] || bindingFrom;
+    const messageIdDomain = fromAddress.split('@')[1];
+    const raw = [
+      `From: ${bindingFrom}`,
+      `To: ${to}`,
+      `Subject: ${subject}`,
+      `Date: ${new Date().toUTCString()}`,
+      `Message-ID: <${crypto.randomUUID()}@${messageIdDomain}>`,
+      'MIME-Version: 1.0',
+      'Content-Type: text/plain; charset=UTF-8',
+      'Content-Transfer-Encoding: 8bit',
+      '',
+      body
+    ].join('\r\n');
+    await env.EMAIL.send(new EmailMessage(fromAddress, to, raw));
+    return;
+  }
+  if (env.RESEND_API_KEY && resendFrom) {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+        'User-Agent': 'rated-n-api'
+      },
+      body: JSON.stringify({ from: resendFrom, to: [to], subject, text: body })
+    });
+    if (!response.ok) throw new ApiProblem(502, 'email_delivery_failed', 'Email delivery provider rejected the message.');
+    return;
+  }
+  throw new ApiProblem(503, 'email_unavailable', 'Email delivery is not configured yet.');
+}
+
+function emailConfigured(env: Env): boolean {
+  return Boolean((env.EMAIL && env.EMAIL_FROM) || (env.RESEND_API_KEY && env.RESEND_FROM));
 }
 
 async function issueVerification(env: Env, user: UserRow): Promise<void> {
@@ -72,7 +94,7 @@ async function login(request: Request, env: Env): Promise<Response> {
 }
 
 async function register(request: Request, env: Env): Promise<Response> {
-  if (!env.EMAIL) throw new ApiProblem(503, 'email_unavailable', 'Email registration is temporarily unavailable.');
+  if (!emailConfigured(env)) throw new ApiProblem(503, 'email_unavailable', 'Email registration is temporarily unavailable.');
   const input = await readJson<{ email?: unknown; password?: unknown }>(request);
   const email = normalizeEmail(input.email);
   const password = validatePassword(input.password);
@@ -121,7 +143,7 @@ async function verifyEmail(request: Request, env: Env): Promise<Response> {
 }
 
 async function resend(request: Request, env: Env): Promise<Response> {
-  if (!env.EMAIL) throw new ApiProblem(503, 'email_unavailable', 'Email delivery is temporarily unavailable.');
+  if (!emailConfigured(env)) throw new ApiProblem(503, 'email_unavailable', 'Email delivery is temporarily unavailable.');
   const { email: rawEmail } = await readJson<{ email?: unknown }>(request);
   const email = normalizeEmail(rawEmail);
   await checkRateLimit(env, `resend:${clientKey(request)}:${email}`, 3, 3600);
@@ -131,7 +153,7 @@ async function resend(request: Request, env: Env): Promise<Response> {
 }
 
 async function forgotPassword(request: Request, env: Env): Promise<Response> {
-  if (!env.EMAIL) throw new ApiProblem(503, 'email_unavailable', 'Password reset email is temporarily unavailable.');
+  if (!emailConfigured(env)) throw new ApiProblem(503, 'email_unavailable', 'Password reset email is temporarily unavailable.');
   const { email: rawEmail } = await readJson<{ email?: unknown }>(request);
   const email = normalizeEmail(rawEmail);
   await checkRateLimit(env, `forgot:${clientKey(request)}:${email}`, 4, 3600);
