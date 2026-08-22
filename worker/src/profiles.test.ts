@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { evidenceIsSupported, gapIsAlreadyCovered, tokenize, weightedScore } from './profiles';
+import { evidenceIsSupported, filterEvidenceItems, gapIsAlreadyCovered, tokenize, weightedScore } from './profiles';
 
 describe('evidence-backed scoring', () => {
   it('has no artificial score floor', () => {
@@ -32,5 +32,9 @@ describe('evidence checks', () => {
 
   it('does not accept unsupported evidence', () => {
     expect(evidenceIsSupported('Built Python forecasting models', 'I coordinated schedules and trained new hires.')).toBe(false);
+  });
+
+  it('keeps non-empty model evidence when every quote is paraphrased', () => {
+    expect(filterEvidenceItems([{ name: 'Team leadership', evidence: 'Led cross-functional teams' }], 'I managed programs and coordinated delivery across departments.')).toHaveLength(1);
   });
 });

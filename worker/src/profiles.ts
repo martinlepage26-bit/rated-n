@@ -41,6 +41,14 @@ export function evidenceIsSupported(candidate: string, experience: string): bool
   return overlap >= 2 && overlap / evidenceTokens.length >= 0.6;
 }
 
+export function filterEvidenceItems<T extends { evidence: string }>(items: T[], experience: string): T[] {
+  const supported = items.filter((item) => evidenceIsSupported(item.evidence, experience));
+  // The model is instructed to quote exact spans, but some responses paraphrase
+  // despite that instruction. Never erase an otherwise non-empty analysis solely
+  // because every quote used a slightly different wording.
+  return supported.length > 0 || items.length === 0 ? supported : items.filter((item) => item.evidence.trim().length >= 3);
+}
+
 export function gapIsAlreadyCovered(gap: string, experience: string): boolean {
   const gapTokens = [...new Set(tokenize(gap))];
   if (!gapTokens.length) return false;
@@ -151,9 +159,9 @@ async function createAnalysis(request: Request, env: Env): Promise<Response> {
     const rawDna = await analyzeExperience(env, experience, region);
     const dna = {
       ...rawDna,
-      competencies: rawDna.competencies.filter((item) => evidenceIsSupported(item.evidence, experience)),
-      skills: rawDna.skills.filter((item) => evidenceIsSupported(item.evidence, experience)),
-      transferable: rawDna.transferable.filter((item) => evidenceIsSupported(item.evidence, experience))
+      competencies: filterEvidenceItems(rawDna.competencies, experience),
+      skills: filterEvidenceItems(rawDna.skills, experience),
+      transferable: filterEvidenceItems(rawDna.transferable, experience)
     };
     const ready = new Date().toISOString();
     if (dna.competencies.length + dna.skills.length + dna.transferable.length === 0) {
