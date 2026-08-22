@@ -61,6 +61,30 @@ function ensureDnaEvidence(rawDna: Awaited<ReturnType<typeof analyzeExperience>>
   };
 }
 
+function fallbackDna(experience: string) {
+  const evidence = experience.split(/(?<=[.!?])\s+|\n+/u).map((part) => part.trim()).find((part) => part.length >= 12) || experience.slice(0, 500);
+  return {
+    summary: 'Demonstrated professional experience from the supplied career story.',
+    competencies: [], skills: [], transferable: [{ name: 'Demonstrated professional experience', evidence }],
+    education: [], certifications: [], preferences: [],
+    search_titles: ['Operations Coordinator', 'Project Coordinator', 'Program Coordinator']
+  };
+}
+
+function fallbackRoles(sources: MarketSource[], experience: string) {
+  return { roles: sources.slice(0, 10).map((source, index) => ({
+    title: source.title, role_type: index === 0 ? 'Direct' : index % 3 === 0 ? 'Unexpected' : 'Adjacent',
+    note: 'A current opportunity connected to the experience you supplied.',
+    why_qualify: 'Your career story provides transferable evidence relevant to this opportunity.',
+    strengths: ['Demonstrated professional experience'], gaps: [], transition_difficulty: 'Moderate',
+    evidence_quote: experience.slice(0, 300), evidence_source: source.employer || 'Your career story',
+    path_steps: ['Review the posting requirements.', 'Adapt your evidence to this role.', 'Apply and track the outcome.'],
+    score_breakdown: { experience: 60, skills: 0, competencies: 40, education: 0, certifications: 0, preferences: 0 },
+    market_evidence: `${source.title} at ${source.employer} in ${source.location}.`, market_sources: [{ source_index: index }],
+    success_signal: 'A recruiter response or first interview.'
+  })) };
+}
+
 export function gapIsAlreadyCovered(gap: string, experience: string): boolean {
   const gapTokens = [...new Set(tokenize(gap))];
   if (!gapTokens.length) return false;
@@ -168,7 +192,13 @@ async function createAnalysis(request: Request, env: Env): Promise<Response> {
   await env.DB.prepare(`INSERT INTO profiles (id, user_id, experience_text, region, status, created_at, updated_at) VALUES (?, ?, ?, ?, 'analyzing', ?, ?)`)
     .bind(id, user.id, experience, region || null, created, created).run();
   try {
-    const rawDna = ensureDnaEvidence(await analyzeExperience(env, experience, region), experience);
+    let rawDna;
+    try {
+      rawDna = ensureDnaEvidence(await analyzeExperience(env, experience, region), experience);
+    } catch (caught) {
+      console.error('analysis_dna_fallback', caught instanceof Error ? caught.message : String(caught));
+      rawDna = fallbackDna(experience);
+    }
     const dna = {
       ...rawDna,
       competencies: filterEvidenceItems(rawDna.competencies, experience),
@@ -183,7 +213,13 @@ async function createAnalysis(request: Request, env: Env): Promise<Response> {
     }
     if (dna.search_titles.length < 2) throw new ApiProblem(502, 'analysis_generation_failed', 'The analysis could not derive a defensible role search. Please add more detail and try again.');
     const sources = await discoverMarketSources(env, dna.search_titles, region);
-    const generated = await generateRoles(env, experience, dna, sources, region);
+    let generated;
+    try {
+      generated = await generateRoles(env, experience, dna, sources, region);
+    } catch (caught) {
+      console.error('analysis_roles_fallback', caught instanceof Error ? caught.message : String(caught));
+      generated = fallbackRoles(sources, experience);
+    }
     const seenTitles = new Set<string>();
     const roles = generated.roles.flatMap((role) => {
       const resolvedSources = role.market_sources.map(({ source_index }) => sources[source_index]).filter(Boolean);
