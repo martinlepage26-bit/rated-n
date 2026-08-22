@@ -5,6 +5,7 @@ import Header from '@/components/ratedn/Header';
 import Toast from '@/components/ratedn/Toast';
 import AnalysisOverlay from '@/components/ratedn/AnalysisOverlay';
 import { SAMPLE_EXPERIENCE } from '@/lib/ratedn';
+import { useAuth } from '@/lib/AuthContext';
 
 export default function Home() {
   const navigate = useNavigate();
@@ -17,6 +18,7 @@ export default function Home() {
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
   const [privacyOpen, setPrivacyOpen] = useState(false);
+  const { user } = useAuth();
   const notify = (message) => { setToast(message); window.setTimeout(() => setToast(''), 2800); };
 
   useEffect(() => {
@@ -30,6 +32,10 @@ export default function Home() {
   }, [searchParams, setSearchParams]);
 
   const runAnalysis = async () => {
+    if (!user) {
+      navigate(`/login?returnTo=${encodeURIComponent('/')}`);
+      return;
+    }
     const trimmed = profileText.trim();
     if (!trimmed) {
       setError('Please describe your experience before continuing.');
