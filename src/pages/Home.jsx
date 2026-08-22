@@ -82,7 +82,7 @@ export default function Home() {
           <h1>Discover what you&rsquo;re qualified <em>to become.</em></h1>
           <p className="lede">Rated N turns the experience you&rsquo;ve accumulated into credible career paths you may not know to search for.</p>
           <div className="actions">
-            <button className="primary" onClick={() => document.getElementById('profile-text')?.focus()}>Show my opportunities <b>&rarr;</b></button>
+            <button className="primary" onClick={() => { const target = document.getElementById('profile-text'); target?.scrollIntoView({ behavior: 'smooth', block: 'center' }); target?.focus(); }}>Show my opportunities <b>&rarr;</b></button>
             <button className="text-btn" onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}>How it works</button>
           </div>
         </div>
