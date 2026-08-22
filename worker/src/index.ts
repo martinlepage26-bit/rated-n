@@ -1,7 +1,10 @@
 import { handleAuth } from './auth';
+import { emailConfigured } from './email';
 import { ApiProblem, assertSameOrigin, handleError, json } from './http';
 import { handleProfiles } from './profiles';
 import type { Env } from './types';
+
+export { AnalysisWorkflow } from './workflow';
 
 function apiPath(url: URL): string {
   if (url.pathname === '/api') return '/';
@@ -21,7 +24,7 @@ export default {
       if (request.method === 'GET' && path === '/config') {
         return json({
           google_auth_enabled: Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET),
-          email_delivery_enabled: Boolean((env.EMAIL && env.EMAIL_FROM) || (env.RESEND_API_KEY && env.RESEND_FROM))
+          email_delivery_enabled: emailConfigured(env)
         });
       }
       if (path.startsWith('/auth/')) return await handleAuth(request, url, path, env);

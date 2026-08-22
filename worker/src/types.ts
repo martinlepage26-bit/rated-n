@@ -22,10 +22,16 @@ export interface EmailBinding {
   send(message: EmailMessage): Promise<void>;
 }
 
+export interface AnalysisWorkflowParams {
+  profileId: string;
+  userId: string;
+}
+
 export interface Env {
   DB: D1Database;
   AI: Ai;
   BROWSER: BrowserBinding;
+  ANALYSIS: Workflow<AnalysisWorkflowParams>;
   EMAIL?: EmailBinding;
   APP_ORIGIN: string;
   AI_MODEL?: string;

@@ -1,0 +1,26 @@
+:root {
+  --background: 40 30% 94%;
+  --foreground: 202 51% 13%;
+  --border: 43 12% 85%;
+  --radius: 0.1875rem;
+  --font-heading: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+  --font-body: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'DM Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --ink: #102632;
+  --navy: #0b1d26;
+  --paper: #f4f1eb;
+  --coral: #e15a42;
+  --moss: #627c68;
+  --sand: #c79d68;
+  --line: #d9d7d0;
+  --muted: #627077;
+}
+
+* { border-color: hsl(var(--border)); }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+}

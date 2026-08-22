@@ -13,7 +13,7 @@ async function mockAuthenticatedApi(page) {
     let status = 200;
     if (path === '/api/config') payload = { google_auth_enabled: true, email_delivery_enabled: true };
     else if (path === '/api/auth/me') payload = { user: { id: 'user-1', email: 'person@example.com' } };
-    else if (path === '/api/profiles/analyze') { payload = { profile }; status = 201; }
+    else if (path === '/api/profiles/analyze') { payload = { profile: { ...profile, status: 'analyzing', roles_count: 0 } }; status = 202; }
     else if (path === `/api/profiles/${profile.id}`) payload = { profile };
     else if (path === `/api/profiles/${profile.id}/roles`) payload = { roles };
     else if (path === `/api/roles/${baseRole.id}/materials`) {
@@ -58,6 +58,33 @@ test('complete discovery, role, save, materials, and dashboard flow', async ({ p
   await page.getByRole('button', { name: 'Dashboard' }).click();
   await expect(page.getByRole('heading', { name: /career stories, tracked/i })).toBeVisible();
   await expect(page.getByText('Program Manager').last()).toBeVisible();
+});
+
+test('results page waits through analyzing then shows live roles', async ({ page }) => {
+  let profileReads = 0;
+  await page.route('**/api/**', async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    let payload;
+    let status = 200;
+    if (path === '/api/config') payload = { google_auth_enabled: true, email_delivery_enabled: true };
+    else if (path === '/api/auth/me') payload = { user: { id: 'user-1', email: 'person@example.com' } };
+    else if (path === '/api/profiles/analyze') {
+      payload = { profile: { ...profile, status: 'analyzing', roles_count: 0 } };
+      status = 202;
+    } else if (path === `/api/profiles/${profile.id}`) {
+      profileReads += 1;
+      payload = { profile: profileReads < 2 ? { ...profile, status: 'analyzing', roles_count: 0 } : profile };
+    } else if (path === `/api/profiles/${profile.id}/roles`) payload = { roles };
+    else { status = 404; payload = { error: { message: `Unmocked ${request.method()} ${path}` } }; }
+    await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(payload) });
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Use an example' }).click();
+  await page.getByRole('button', { name: /Find my paths/ }).click();
+  await expect(page).toHaveURL(`/results/${profile.id}`);
+  await expect(page.getByRole('heading', { name: /Reading everything you’ve done/i })).toBeVisible();
+  await expect(page.getByText('8', { exact: true }).first()).toBeVisible();
 });
 
 test('upload, validation, and mobile navigation remain usable', async ({ page }) => {

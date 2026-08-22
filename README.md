@@ -1,6 +1,6 @@
 # Rated N
 
-Rated N turns a user’s career story into evidence-backed Professional DNA, then compares that evidence with current public job listings. It includes private accounts, persistent career stories and roles, saved-path tracking, application status, and grounded résumé, cover-letter, and LinkedIn material generation.
+Rated N turns a user’s career story into evidence-backed Professional DNA, then compares that evidence with current public job listings. It includes private accounts, persistent career stories and roles, saved-path tracking, application status, and grounded résumé, cover-letter, and LinkedIn material generation. If the story has no defensible capability evidence, results stay empty. If the analysis engine fails, the profile is marked failed. Rated N does not invent capabilities, job titles, or match scores to keep the request alive. `POST /profiles/analyze` returns immediately with `status: analyzing`; the results page polls until the Workflow writes `ready` or `failed`.
 
 ## Architecture
 
@@ -9,6 +9,7 @@ Rated N turns a user’s career story into evidence-backed Professional DNA, the
 - Dedicated `rated-n-api` Cloudflare Worker
 - D1 for users, sessions, profiles, roles, and short-lived market cache
 - Workers AI structured output for analysis and application materials
+- Cloudflare Workflow (`rated-n-analysis`) for durable DNA extraction, market discovery, and role matching
 - Browser Run for current public-job discovery
 - HttpOnly, Secure, SameSite session cookies; PBKDF2 password hashing; hashed session, verification, and reset tokens
 

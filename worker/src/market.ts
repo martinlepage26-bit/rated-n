@@ -49,10 +49,14 @@ function attribute(element: ScrapedElement | undefined, name: string): string {
   return element?.attributes?.find((item) => item.name.toLowerCase() === name)?.value || '';
 }
 
-async function fetchDescription(source: MarketSource): Promise<MarketSource> {
+function isLinkedInHost(hostname: string): boolean {
+  return /(^|\.)linkedin\.com$/u.test(hostname);
+}
+
+async function enrichLinkedInDescription(source: MarketSource): Promise<MarketSource> {
   try {
     const url = new URL(source.url);
-    if (!/(^|\.)linkedin\.com$/u.test(url.hostname)) return source;
+    if (!isLinkedInHost(url.hostname)) return source;
     const response = await fetch(url, {
       headers: { 'User-Agent': 'RatedN/1.0 career-discovery; public-job-evidence' },
       redirect: 'follow',
@@ -68,17 +72,7 @@ async function fetchDescription(source: MarketSource): Promise<MarketSource> {
   }
 }
 
-export async function discoverMarketSources(env: Env, searchTitles: string[], region: string): Promise<MarketSource[]> {
-  const titles = [...new Set(searchTitles.map(clean).filter(Boolean))].slice(0, 4);
-  if (!titles.length) throw new ApiProblem(422, 'no_search_titles', 'No credible market search could be derived from this experience.');
-  const location = clean(region) || 'Remote';
-  const queryKey = await sha256(JSON.stringify([titles.map((value) => value.toLowerCase()), location.toLowerCase()]));
-  const cached = await env.DB.prepare('SELECT payload_json FROM market_cache WHERE query_key = ? AND expires_at > ?')
-    .bind(queryKey, new Date().toISOString()).first<{ payload_json: string }>();
-  if (cached) {
-    try { return JSON.parse(cached.payload_json) as MarketSource[]; } catch { /* refresh malformed cache */ }
-  }
-
+async function scrapeLinkedInJobs(env: Env, titles: string[], location: string): Promise<MarketSource[]> {
   const search = new URL('https://www.linkedin.com/jobs/search/');
   search.searchParams.set('keywords', titles.join(' OR '));
   search.searchParams.set('location', location);
@@ -101,14 +95,15 @@ export async function discoverMarketSources(env: Env, searchTitles: string[], re
     });
     payload = await browserResponse.json<ScrapePayload>();
   } catch (caught) {
-    console.error('market_scrape_failed', caught instanceof Error ? caught.message : String(caught));
+    console.error('linkedin_scrape_failed', caught instanceof Error ? caught.message : String(caught));
     throw new ApiProblem(503, 'market_discovery_unavailable', 'Live role discovery is temporarily unavailable. Please try again shortly.');
   }
 
   if (!payload.success) {
-    console.error('market_scrape_rejected', payload.errors?.map((error) => error.message).join('; '));
+    console.error('linkedin_scrape_rejected', payload.errors?.map((error) => error.message).join('; '));
     throw new ApiProblem(503, 'market_discovery_unavailable', 'Live role discovery is temporarily unavailable. Please try again shortly.');
   }
+
   const links = groupResults(payload, 'a.base-card__full-link');
   const jobTitles = groupResults(payload, '.base-search-card__title');
   const employers = groupResults(payload, '.base-search-card__subtitle');
@@ -120,7 +115,7 @@ export async function discoverMarketSources(env: Env, searchTitles: string[], re
     let normalizedUrl: string;
     try {
       const candidate = new URL(rawUrl);
-      if (!/(^|\.)linkedin\.com$/u.test(candidate.hostname)) continue;
+      if (!isLinkedInHost(candidate.hostname)) continue;
       normalizedUrl = candidate.toString();
     } catch { continue; }
     const title = clean(jobTitles[index]?.text || links[index]?.text);
@@ -133,8 +128,23 @@ export async function discoverMarketSources(env: Env, searchTitles: string[], re
   const selected = found.slice(0, 14);
   const enriched: MarketSource[] = [];
   for (let index = 0; index < selected.length; index += 4) {
-    enriched.push(...await Promise.all(selected.slice(index, index + 4).map(fetchDescription)));
+    enriched.push(...await Promise.all(selected.slice(index, index + 4).map(enrichLinkedInDescription)));
   }
+  return enriched;
+}
+
+export async function discoverMarketSources(env: Env, searchTitles: string[], region: string): Promise<MarketSource[]> {
+  const titles = [...new Set(searchTitles.map(clean).filter(Boolean))].slice(0, 4);
+  if (!titles.length) throw new ApiProblem(422, 'no_search_titles', 'No credible market search could be derived from this experience.');
+  const location = clean(region) || 'Remote';
+  const queryKey = await sha256(JSON.stringify([titles.map((value) => value.toLowerCase()), location.toLowerCase()]));
+  const cached = await env.DB.prepare('SELECT payload_json FROM market_cache WHERE query_key = ? AND expires_at > ?')
+    .bind(queryKey, new Date().toISOString()).first<{ payload_json: string }>();
+  if (cached) {
+    try { return JSON.parse(cached.payload_json) as MarketSource[]; } catch { /* refresh malformed cache */ }
+  }
+
+  const enriched = await scrapeLinkedInJobs(env, titles, location);
   const timestamp = new Date();
   await env.DB.prepare(`INSERT INTO market_cache (query_key, payload_json, expires_at, created_at) VALUES (?, ?, ?, ?)
     ON CONFLICT(query_key) DO UPDATE SET payload_json = excluded.payload_json, expires_at = excluded.expires_at, created_at = excluded.created_at`)

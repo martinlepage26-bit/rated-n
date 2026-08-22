@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { api } from '@/lib/api';
+import AnalysisOverlay from '@/components/ratedn/AnalysisOverlay';
 import Header from '@/components/ratedn/Header';
 
 const TYPE_ORDER = ['Direct', 'Adjacent', 'Unexpected', 'Stretch'];
 const TYPE_COLOR = { Direct: 'ink', Adjacent: 'coral', Unexpected: 'moss', Stretch: 'sand' };
+const POLL_MS = 1500;
+const POLL_LIMIT_MS = 12 * 60 * 1000;
 
 export default function Results() {
   const { profileId } = useParams();
@@ -15,24 +18,74 @@ export default function Results() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filter, setFilter] = useState('All');
+  const startedAt = useRef(Date.now());
 
   useEffect(() => {
     let active = true;
-    Promise.all([api.profiles.get(profileId), api.profiles.roles(profileId)])
-      .then(([profileResult, roleResult]) => {
+    let timer;
+    startedAt.current = Date.now();
+
+    const poll = async () => {
+      try {
+        const { profile: nextProfile } = await api.profiles.get(profileId);
         if (!active) return;
-        setProfile(profileResult.profile);
-        setRoles(roleResult.roles);
-      })
-      .catch((caught) => { if (active) setError(caught.message); })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
+        setProfile(nextProfile);
+        if (nextProfile.status === 'analyzing') {
+          if (Date.now() - startedAt.current > POLL_LIMIT_MS) {
+            setError('Analysis is taking longer than expected. Open this page again in a minute, or try a new story.');
+            setLoading(false);
+            return;
+          }
+          timer = window.setTimeout(poll, POLL_MS);
+          return;
+        }
+        if (nextProfile.status === 'failed') {
+          setError(nextProfile.error_message || 'The analysis could not be completed.');
+          setLoading(false);
+          return;
+        }
+        const { roles: nextRoles } = await api.profiles.roles(profileId);
+        if (!active) return;
+        setRoles(nextRoles);
+        setLoading(false);
+      } catch (caught) {
+        if (active) {
+          setError(caught.message);
+          setLoading(false);
+        }
+      }
+    };
+
+    poll();
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
   }, [profileId]);
 
   const visible = filter === 'All' ? roles : roles.filter((role) => role.role_type === filter);
+  const analyzing = loading && !error && (profile?.status === 'analyzing' || !profile);
 
-  if (loading) return <main><Header /><div className="page-loading"><div className="analysis-spinner" /><p>Reading your opportunities&hellip;</p></div></main>;
-  if (error) return <main><Header /><div className="page-loading"><p role="alert">{error}</p><button className="text-btn" onClick={() => navigate('/')}>Back to overview</button></div></main>;
+  if (analyzing) {
+    return (
+      <main>
+        <Header />
+        <AnalysisOverlay visible />
+      </main>
+    );
+  }
+
+  if (error || profile?.status === 'failed') {
+    return (
+      <main>
+        <Header />
+        <div className="page-loading">
+          <p role="alert">{error || profile?.error_message || 'The analysis could not be completed.'}</p>
+          <button className="text-btn" onClick={() => navigate('/')}>Back to overview</button>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main>
