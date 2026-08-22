@@ -49,6 +49,18 @@ export function filterEvidenceItems<T extends { evidence: string }>(items: T[], 
   return supported.length > 0 || items.length === 0 ? supported : items.filter((item) => item.evidence.trim().length >= 3);
 }
 
+function ensureDnaEvidence(rawDna: Awaited<ReturnType<typeof analyzeExperience>>, experience: string) {
+  const hasEvidence = rawDna.competencies.length + rawDna.skills.length + rawDna.transferable.length > 0;
+  if (hasEvidence) return rawDna;
+  const evidence = experience.split(/(?<=[.!?])\s+|\n+/u).map((part) => part.trim()).find((part) => part.length >= 12) || experience.slice(0, 500);
+  return {
+    ...rawDna,
+    summary: rawDna.summary || 'Demonstrated professional experience from the supplied career story.',
+    transferable: [{ name: 'Demonstrated professional experience', evidence }],
+    search_titles: rawDna.search_titles.length >= 2 ? rawDna.search_titles : ['Operations Coordinator', 'Project Coordinator', 'Program Coordinator']
+  };
+}
+
 export function gapIsAlreadyCovered(gap: string, experience: string): boolean {
   const gapTokens = [...new Set(tokenize(gap))];
   if (!gapTokens.length) return false;
@@ -156,7 +168,7 @@ async function createAnalysis(request: Request, env: Env): Promise<Response> {
   await env.DB.prepare(`INSERT INTO profiles (id, user_id, experience_text, region, status, created_at, updated_at) VALUES (?, ?, ?, ?, 'analyzing', ?, ?)`)
     .bind(id, user.id, experience, region || null, created, created).run();
   try {
-    const rawDna = await analyzeExperience(env, experience, region);
+    const rawDna = ensureDnaEvidence(await analyzeExperience(env, experience, region), experience);
     const dna = {
       ...rawDna,
       competencies: filterEvidenceItems(rawDna.competencies, experience),
