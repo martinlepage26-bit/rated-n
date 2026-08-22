@@ -25,6 +25,22 @@ export function tokenize(value: string): string[] {
   });
 }
 
+function normalizeEvidence(value: string): string {
+  return value.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/gu, '').replace(/[^a-z0-9+#.]+/gu, ' ').replace(/\s+/gu, ' ').trim();
+}
+
+export function evidenceIsSupported(candidate: string, experience: string): boolean {
+  const evidence = normalizeEvidence(candidate.replace(/^[“”"']+|[“”"']+$/gu, ''));
+  const story = normalizeEvidence(experience);
+  if (evidence.length < 3 || !story) return false;
+  if (story.includes(evidence)) return true;
+  const evidenceTokens = [...new Set(tokenize(evidence))];
+  if (evidenceTokens.length < 2) return false;
+  const storyTokens = new Set(tokenize(story));
+  const overlap = evidenceTokens.filter((token) => storyTokens.has(token)).length;
+  return overlap >= 2 && overlap / evidenceTokens.length >= 0.6;
+}
+
 export function gapIsAlreadyCovered(gap: string, experience: string): boolean {
   const gapTokens = [...new Set(tokenize(gap))];
   if (!gapTokens.length) return false;
@@ -135,9 +151,9 @@ async function createAnalysis(request: Request, env: Env): Promise<Response> {
     const rawDna = await analyzeExperience(env, experience, region);
     const dna = {
       ...rawDna,
-      competencies: rawDna.competencies.filter((item) => experience.includes(item.evidence.trim().replace(/^[“”"']+|[“”"']+$/gu, '').trim())),
-      skills: rawDna.skills.filter((item) => experience.includes(item.evidence.trim().replace(/^[“”"']+|[“”"']+$/gu, '').trim())),
-      transferable: rawDna.transferable.filter((item) => experience.includes(item.evidence.trim().replace(/^[“”"']+|[“”"']+$/gu, '').trim()))
+      competencies: rawDna.competencies.filter((item) => evidenceIsSupported(item.evidence, experience)),
+      skills: rawDna.skills.filter((item) => evidenceIsSupported(item.evidence, experience)),
+      transferable: rawDna.transferable.filter((item) => evidenceIsSupported(item.evidence, experience))
     };
     const ready = new Date().toISOString();
     if (dna.competencies.length + dna.skills.length + dna.transferable.length === 0) {

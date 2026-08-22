@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { gapIsAlreadyCovered, tokenize, weightedScore } from './profiles';
+import { evidenceIsSupported, gapIsAlreadyCovered, tokenize, weightedScore } from './profiles';
 
 describe('evidence-backed scoring', () => {
   it('has no artificial score floor', () => {
@@ -22,5 +22,15 @@ describe('computed gap checks', () => {
 
   it('normalizes common inflections', () => {
     expect(tokenize('managed budgets')).toEqual(['manag', 'budget']);
+  });
+});
+
+describe('evidence checks', () => {
+  it('accepts case, punctuation, and whitespace differences from the model', () => {
+    expect(evidenceIsSupported('Managed  client-facing operations.', 'I managed client-facing operations across three teams.')).toBe(true);
+  });
+
+  it('does not accept unsupported evidence', () => {
+    expect(evidenceIsSupported('Built Python forecasting models', 'I coordinated schedules and trained new hires.')).toBe(false);
   });
 });
