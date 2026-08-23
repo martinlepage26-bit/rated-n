@@ -57,10 +57,31 @@ npx wrangler secret put GOOGLE_CLIENT_ID --config worker/wrangler.jsonc
 npx wrangler secret put GOOGLE_CLIENT_SECRET --config worker/wrangler.jsonc
 ```
 
-Deploy the API before the Pages app so the service binding resolves:
+## Releasing
+
+The Worker and the Pages site are two deployments that have to agree on the
+same request protocol, so Rated N ships them as one release rather than
+separately:
 
 ```bash
-npm run deploy:api
-npm run build
-npm run deploy:web
+npm run release
 ```
+
+That runs typecheck, tests and lint, builds the frontend, stamps the release
+commit into both halves, deploys the API before the site so the service binding
+resolves, and then refuses to report success unless the live `/release.json`
+and the live `/api/health` both report that commit.
+
+```bash
+npm run release:preview   # ship the current branch to a Pages preview
+npm run verify:release    # check the live halves are on the same commit
+```
+
+`npm run release` requires a clean working tree, because a release has to be
+reproducible from a commit; pass `--allow-dirty` to override deliberately.
+
+Deploying only one half is what breaks this app: when the API moved to an
+asynchronous analysis, production Pages kept serving a frontend that expected
+the result inline, and every analysis appeared to return nothing. Both halves
+were individually healthy, so nothing surfaced it. `verify:release` exists to
+make that state impossible to miss.

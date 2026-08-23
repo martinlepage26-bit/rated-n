@@ -34,6 +34,8 @@ export interface Env {
   ANALYSIS: Workflow<AnalysisWorkflowParams>;
   EMAIL?: EmailBinding;
   APP_ORIGIN: string;
+  /** Commit this Worker was released from; compared against the site's release.json. */
+  RELEASE_COMMIT?: string;
   AI_MODEL?: string;
   SESSION_DAYS?: string;
   EMAIL_FROM?: string;

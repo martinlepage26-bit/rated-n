@@ -19,7 +19,7 @@ export default {
       if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: { Allow: 'GET, POST, PATCH, OPTIONS' } });
       assertSameOrigin(request, env);
       if (request.method === 'GET' && (path === '/health' || path === '/')) {
-        return json({ ok: true, service: 'rated-n-api' }, 200, { 'Cache-Control': 'public, max-age=30' });
+        return json({ ok: true, service: 'rated-n-api', release: env.RELEASE_COMMIT || 'unknown' }, 200, { 'Cache-Control': 'public, max-age=30' });
       }
       if (request.method === 'GET' && path === '/config') {
         return json({

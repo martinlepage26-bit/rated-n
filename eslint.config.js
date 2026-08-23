@@ -36,5 +36,13 @@ export default [
   {
     files: ['src/lib/AuthContext.jsx'],
     rules: { 'react-refresh/only-export-components': 'off' }
+  },
+  {
+    files: ['scripts/**/*.mjs'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: { ...globals.node, fetch: 'readonly' }
+    }
   }
 ];

@@ -16,8 +16,9 @@
     "cf:types": "wrangler types --config worker/wrangler.jsonc worker/worker-configuration.d.ts",
     "db:migrate:local": "wrangler d1 migrations apply rated-n-db --local --config worker/wrangler.jsonc",
     "db:migrate:remote": "wrangler d1 migrations apply rated-n-db --remote --config worker/wrangler.jsonc",
-    "deploy:api": "wrangler deploy --config worker/wrangler.jsonc",
-    "deploy:web": "wrangler pages deploy dist --project-name rated-n"
+    "release": "node scripts/release.mjs",
+    "release:preview": "node scripts/release.mjs --target=preview",
+    "verify:release": "node scripts/verify-release.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.475.0",
