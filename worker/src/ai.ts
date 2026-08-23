@@ -122,7 +122,7 @@ const DNA_SHAPE = `Return one JSON object with exactly these keys:
 "skills": array of {"name","evidence"},
 "transferable": array of {"name","evidence"},
 "education": array of strings,
-"certifications": array of strings,
+"certifications": array of strings — include licences, tickets, permits and trade credentials, not only formal certificates,
 "preferences": array of strings,
 "search_titles": array of 2-6 job-search titles grounded in the extracted capabilities.
 When the story describes any professional activity, populate competencies, skills and transferable with three to six entries each — cover every distinct area of work the story mentions, not just the first two. Empty arrays are only correct when the text contains no professional activity at all. Reply with the JSON object only: no commentary, no code fences.`;
@@ -152,7 +152,7 @@ export async function analyzeExperience(env: Env, experience: string, region: st
   });
 }
 
-const ROLES_SYSTEM = `You are Rated N's rigorous career-path analyst. Produce 8-10 distinct opportunities tied to the supplied current public job postings. Use exact or normalized titles from those postings, cite valid source indexes, and span Direct, Adjacent, Unexpected, and Stretch when evidence supports them. Scores are evidence overlap, never optimism: each breakdown dimension is 0-100, and missing evidence is 0. Gaps must be actual posting requirements absent from the career story—never list something the user already demonstrated. evidence_quote must be one short verbatim substring of the career story, not its whole text. Do not invent credentials, employers, achievements, or numbers. Market evidence must name concrete employers/locations or posting requirements from the supplied records.`;
+const ROLES_SYSTEM = `You are Rated N's rigorous career-path analyst. Produce 8-10 distinct opportunities tied to the supplied current public job postings. Use exact or normalized titles from those postings, cite valid source indexes, and span Direct, Adjacent, Unexpected, and Stretch when evidence supports them. Score each breakdown dimension 0-100 as how strongly that part of the candidate's verified DNA supports THIS role. experience: depth and relevance of their work history to this posting. skills: overlap between their listed skills and the work described. competencies: overlap between their competencies and transferable capabilities and what this role demands. education: relevance of the education they list. certifications: relevance of the credentials, licences and tickets they already hold — a portable credential still counts where it transfers to this role, even when the posting does not name it. preferences: fit with their stated location and work preferences. Score 0 only where they have no evidence of that kind or none of it transfers. These are overlap judgements, never optimism. Gaps must be actual posting requirements absent from the career story—never list something the user already demonstrated. evidence_quote must be one short verbatim substring of the career story, not its whole text. Do not invent credentials, employers, achievements, or numbers. Market evidence must name concrete employers/locations or posting requirements from the supplied records.`;
 
 const ROLES_SHAPE = `Return one JSON object shaped {"roles":[...]} with 8-10 entries. Each entry has exactly these keys:
 "title" (string), "role_type" (one of Direct, Adjacent, Unexpected, Stretch), "note" (string),
