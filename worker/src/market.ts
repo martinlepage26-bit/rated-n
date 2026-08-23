@@ -23,6 +23,21 @@ function clean(value: string | undefined): string {
   return (value || '').replace(/\s+/gu, ' ').trim();
 }
 
+// A posting's opening section carries the summary and requirements the analyst
+// actually matches against; the rest is benefits, EEO boilerplate and legal
+// text. Carrying all of it made the postings roughly nine tenths of the roles
+// prompt for no gain in the answer.
+const DESCRIPTION_LIMIT = 1_200;
+
+export function condense(value: string, limit = DESCRIPTION_LIMIT): string {
+  if (value.length <= limit) return value;
+  const window = value.slice(0, limit);
+  const sentence = window.lastIndexOf('. ');
+  if (sentence > limit * 0.6) return window.slice(0, sentence + 1);
+  const word = window.lastIndexOf(' ');
+  return `${(word > limit * 0.6 ? window.slice(0, word) : window).trimEnd()}…`;
+}
+
 function decodeHtml(value: string): string {
   const named: Record<string, string> = { amp: '&', apos: "'", quot: '"', lt: '<', gt: '>', nbsp: ' ' };
   return value
@@ -66,7 +81,7 @@ async function enrichLinkedInDescription(source: MarketSource): Promise<MarketSo
     const html = await response.text();
     const match = html.match(/<div[^>]+class="[^"]*show-more-less-html__markup[^"]*"[^>]*>([\s\S]*?)<\/div>/iu);
     if (!match) return source;
-    return { ...source, description: decodeHtml(match[1]).slice(0, 4_500) };
+    return { ...source, description: condense(decodeHtml(match[1])) };
   } catch {
     return source;
   }
