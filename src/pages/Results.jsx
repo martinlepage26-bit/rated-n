@@ -24,6 +24,13 @@ export default function Results() {
     let active = true;
     let timer;
     startedAt.current = Date.now();
+    // React Router reuses this component between /results/:a and /results/:b, so
+    // without this the previous profile's roles stay on screen under the new
+    // profile's URL until its first fetch resolves.
+    setLoading(true);
+    setError('');
+    setProfile(null);
+    setRoles([]);
 
     const poll = async () => {
       try {

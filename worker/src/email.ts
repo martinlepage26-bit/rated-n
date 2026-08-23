@@ -1,12 +1,14 @@
 import { EmailMessage } from 'cloudflare:email';
-import { ApiProblem } from './http';
+import { ApiProblem, assertHeaderSafe } from './http';
 import type { Env } from './types';
 
 export function emailConfigured(env: Env): boolean {
   return Boolean((env.EMAIL && env.EMAIL_FROM) || (env.RESEND_API_KEY && env.RESEND_FROM));
 }
 
-export async function sendTextEmail(env: Env, to: string, subject: string, body: string): Promise<void> {
+export async function sendTextEmail(env: Env, recipient: string, subjectLine: string, body: string): Promise<void> {
+  const to = assertHeaderSafe(recipient, 'recipient');
+  const subject = assertHeaderSafe(subjectLine, 'subject');
   const bindingFrom = env.EMAIL_FROM;
   const resendFrom = env.RESEND_FROM;
   if (env.EMAIL && bindingFrom) {

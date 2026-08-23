@@ -179,6 +179,10 @@ export async function generateRoles(env: Env, experience: string, dna: Dna, sour
       if (parsed.dropped) console.error('ai_roles_entries_dropped', parsed.dropped, 'kept', parsed.roles.length);
       return parsed.roles.length ? { roles: parsed.roles } : null;
     },
+    // Without this a later attempt returning two roles would replace an earlier
+    // one returning seven, and matchRoles would drop to the postings fallback
+    // holding the worse of the two answers.
+    merge: (best, next) => (!best || next.roles.length > best.roles.length ? next : best),
     accept: (candidate) => candidate.roles.length >= 8,
     allowPartial: true,
     messages: (mode) => {

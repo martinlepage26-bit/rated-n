@@ -21,6 +21,18 @@ const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff'
 };
 
+/**
+ * Rejects CR/LF in a value interpolated into a mail header. Every caller today
+ * passes an address through normalizeEmail, which already refuses newlines, so
+ * this guards the boundary rather than a live hole: sendTextEmail builds raw
+ * headers by concatenation, and its safety should not depend on each caller
+ * remembering to sanitise first.
+ */
+export function assertHeaderSafe(value: string, field: string): string {
+  if (/[\r\n]/u.test(value)) throw new ApiProblem(400, 'invalid_email_header', `The ${field} value contains an illegal line break.`);
+  return value;
+}
+
 export function json(payload: unknown, status = 200, extraHeaders: HeadersInit = {}): Response {
   return Response.json(payload, {
     status,

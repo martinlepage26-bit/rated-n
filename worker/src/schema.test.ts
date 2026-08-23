@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { dnaJsonSchema, mergeDna, parseLooseDna, parseLooseRoles, rolesJsonSchema, toJsonSchema } from './schema';
 import { z } from 'zod';
+import { ApiProblem, assertHeaderSafe } from './http';
 
 describe('toJsonSchema', () => {
   it('emits a closed object contract from Zod', () => {
@@ -130,5 +131,16 @@ describe('parseLooseRoles', () => {
     const parsed = parseLooseRoles({ roles: [{ title: 'x' }, { nope: true }] });
     expect(parsed?.roles).toHaveLength(0);
     expect(parsed?.dropped).toBe(2);
+  });
+});
+
+describe('assertHeaderSafe', () => {
+  it('passes an ordinary address through', () => {
+    expect(assertHeaderSafe('user@example.com', 'recipient')).toBe('user@example.com');
+  });
+
+  it('refuses a value that would inject a mail header', () => {
+    expect(() => assertHeaderSafe('user@example.com\r\nBcc: attacker@evil.test', 'recipient')).toThrow(ApiProblem);
+    expect(() => assertHeaderSafe('Subject\nX-Injected: 1', 'subject')).toThrow(ApiProblem);
   });
 });

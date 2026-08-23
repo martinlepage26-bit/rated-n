@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { analyzeExperience, extractJson, isEngineUnavailable } from './ai';
+import { analyzeExperience, extractJson, generateRoles, isEngineUnavailable } from './ai';
 import { ApiProblem } from './http';
 import type { Env } from './types';
 
@@ -113,3 +113,39 @@ describe('analyzeExperience', () => {
     });
   });
 });
+
+describe('generateRoles', () => {
+  const role = (title: string) => ({
+    title, role_type: 'Direct', note: 'A posting.', why_qualify: 'Evidence carries.',
+    strengths: ['Delivery'], gaps: [], transition_difficulty: 'Moderate',
+    evidence_quote: 'coordinated oncology clinical trials', evidence_source: 'Career story',
+    path_steps: ['Review.', 'Map.', 'Apply.'],
+    score_breakdown: { experience: 70, skills: 60, competencies: 65, education: 0, certifications: 0, preferences: 0 },
+    market_evidence: 'Hiring in Montreal.', market_sources: [{ source_index: 0 }], success_signal: 'A reply.'
+  });
+  const dna = {
+    summary: 'A profile.', competencies: [], skills: [], transferable: [],
+    education: [], certifications: [], preferences: [], search_titles: []
+  };
+  const sources = [{ title: 'Coordinator', employer: 'Example Co', location: 'Montreal', url: 'https://example.test/1' }];
+
+  it('keeps the largest partial instead of whatever the last attempt returned', async () => {
+    // Seven roles then two: the smaller answer must not replace the larger one,
+    // or matchRoles falls back holding the worse of the two.
+    const seven = { roles: Array.from({ length: 7 }, (_, i) => role(`Role ${i}`)) };
+    const two = { roles: [role('Late A'), role('Late B')] };
+    const { env, modes } = envWith((used) => (used === 'json_object' ? seven : two));
+    const result = await generateRoles(env, STORY, dna, sources, 'Montreal');
+    expect(modes).toHaveLength(3);
+    expect(result.roles).toHaveLength(7);
+  });
+
+  it('returns the accepted answer as soon as one reaches eight', async () => {
+    const eight = { roles: Array.from({ length: 8 }, (_, i) => role(`Role ${i}`)) };
+    const { env, modes } = envWith(() => eight);
+    const result = await generateRoles(env, STORY, dna, sources, 'Montreal');
+    expect(modes).toEqual(['json_object']);
+    expect(result.roles).toHaveLength(8);
+  });
+});
+
