@@ -1,15 +1,15 @@
-import { z } from 'zod';
 import { ApiProblem } from './http';
 import {
   dnaIsPopulated,
   dnaJsonSchema,
-  looseRolesSchema,
   materialsJsonSchema,
   materialsSchema,
   mergeDna,
   parseLooseDna,
+  parseLooseRoles,
   rolesJsonSchema,
   type Dna,
+  type GeneratedRole,
   type Materials
 } from './schema';
 import type { Env, MarketSource } from './types';
@@ -125,7 +125,7 @@ const DNA_SHAPE = `Return one JSON object with exactly these keys:
 "certifications": array of strings,
 "preferences": array of strings,
 "search_titles": array of 2-6 job-search titles grounded in the extracted capabilities.
-When the story describes any professional activity, populate competencies, skills and transferable with at least two entries each. Empty arrays are only correct when the text contains no professional activity at all. Reply with the JSON object only: no commentary, no code fences.`;
+When the story describes any professional activity, populate competencies, skills and transferable with three to six entries each — cover every distinct area of work the story mentions, not just the first two. Empty arrays are only correct when the text contains no professional activity at all. Reply with the JSON object only: no commentary, no code fences.`;
 
 export async function analyzeExperience(env: Env, experience: string, region: string): Promise<Dna> {
   const context = `Career story:\n${experience}\n\nPreferred market/location: ${region || 'Remote / not specified'}`;
@@ -167,13 +167,17 @@ Reply with the JSON object only: no commentary, no code fences.`;
 export async function generateRoles(env: Env, experience: string, dna: Dna, sources: MarketSource[], region: string) {
   const sourceText = sources.map((source, index) => `[${index}] ${source.title} | ${source.employer} | ${source.location}\n${source.description || 'Public job card only; no description was available.'}`).join('\n\n');
   const context = `Career story:\n${experience}\n\nVerified Professional DNA:\n${JSON.stringify(dna)}\n\nRegion: ${region || 'Remote / not specified'}\n\nCurrent public job postings (cite these source indexes):\n${sourceText}`;
-  return runLadder<z.infer<typeof looseRolesSchema>>(env, {
+  return runLadder<{ roles: GeneratedRole[] }>(env, {
     label: 'ai_roles',
     maxTokens: 8_000,
     jsonSchema: rolesJsonSchema,
     parse: (candidate) => {
-      const parsed = looseRolesSchema.safeParse(candidate);
-      return parsed.success ? parsed.data : null;
+      const parsed = parseLooseRoles(candidate);
+      if (!parsed) return null;
+      // Salvage is silent otherwise, and a quietly thinned list is how a real
+      // comparison decays into a constant without anything looking broken.
+      if (parsed.dropped) console.error('ai_roles_entries_dropped', parsed.dropped, 'kept', parsed.roles.length);
+      return parsed.roles.length ? { roles: parsed.roles } : null;
     },
     accept: (candidate) => candidate.roles.length >= 8,
     allowPartial: true,

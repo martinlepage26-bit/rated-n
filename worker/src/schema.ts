@@ -45,7 +45,7 @@ export const generatedRoleSchema = z.object({
   transition_difficulty: z.enum(['Low', 'Low–Moderate', 'Moderate', 'Moderate–High', 'High']),
   evidence_quote: z.string().min(1).max(700),
   evidence_source: z.string().min(1).max(100),
-  path_steps: z.array(z.string().min(1).max(260)).min(3).max(5),
+  path_steps: z.array(z.string().min(1).max(260)).min(1).max(5),
   score_breakdown: scoreSchema,
   market_evidence: z.string().min(1).max(900),
   market_sources: z.array(marketSourceIndexSchema).min(1).max(4),
@@ -189,8 +189,100 @@ export function mergeDna(base: Dna | null, next: Dna): Dna {
   };
 }
 
-// The AI layer accepts a short list so a partial answer can still contribute;
-// analysis.ts holds the real "enough distinct opportunities" gate.
-export const looseRolesSchema = z.object({
-  roles: z.array(generatedRoleSchema).min(1).max(10)
-});
+
+const DIFFICULTY_BY_KEY: Record<string, GeneratedRole['transition_difficulty']> = {
+  low: 'Low',
+  'low-moderate': 'Low–Moderate',
+  'low-medium': 'Low–Moderate',
+  moderate: 'Moderate',
+  medium: 'Moderate',
+  'moderate-high': 'Moderate–High',
+  'medium-high': 'Moderate–High',
+  high: 'High'
+};
+
+const ROLE_TYPE_BY_KEY: Record<string, GeneratedRole['role_type']> = {
+  direct: 'Direct', adjacent: 'Adjacent', unexpected: 'Unexpected', stretch: 'Stretch'
+};
+
+/** Collapses hyphen, en dash, em dash and spacing variants onto one lookup key. */
+function enumKey(value: unknown): string {
+  return typeof value === 'string' ? value.toLowerCase().replace(/[\s_\u2010-\u2015-]+/gu, '-').replace(/^-|-$/gu, '') : '';
+}
+
+function clampText(value: unknown, max: number): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed ? trimmed.slice(0, max) : undefined;
+}
+
+function clampList(value: unknown, max: number, itemMax: number): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    const text = clampText(item, itemMax);
+    return text ? [text] : [];
+  }).slice(0, max);
+}
+
+function clampScore(value: unknown): number {
+  const numeric = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(numeric) ? Math.max(0, Math.min(100, Math.round(numeric))) : 0;
+}
+
+/**
+ * Repairs the near-misses a language model makes on a shape it was only told
+ * about in prose: an ASCII hyphen where the enum wants an en dash, a list one
+ * item over its bound, a score as a string. These are transcription slips, not
+ * wrong answers, and rejecting them discards real analysis.
+ */
+function normalizeRole(raw: unknown): unknown {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const role = raw as Record<string, unknown>;
+  const breakdown = (role.score_breakdown && typeof role.score_breakdown === 'object' ? role.score_breakdown : {}) as Record<string, unknown>;
+  const sources = Array.isArray(role.market_sources) ? role.market_sources : [];
+  return {
+    title: clampText(role.title, 120),
+    role_type: ROLE_TYPE_BY_KEY[enumKey(role.role_type)] ?? 'Adjacent',
+    note: clampText(role.note, 240),
+    why_qualify: clampText(role.why_qualify, 900),
+    strengths: clampList(role.strengths, 8, 100),
+    gaps: clampList(role.gaps, 7, 180),
+    transition_difficulty: DIFFICULTY_BY_KEY[enumKey(role.transition_difficulty)] ?? 'Moderate',
+    evidence_quote: clampText(role.evidence_quote, 700),
+    evidence_source: clampText(role.evidence_source, 100) ?? 'Your career story',
+    path_steps: clampList(role.path_steps, 5, 260),
+    score_breakdown: {
+      experience: clampScore(breakdown.experience),
+      skills: clampScore(breakdown.skills),
+      competencies: clampScore(breakdown.competencies),
+      education: clampScore(breakdown.education),
+      certifications: clampScore(breakdown.certifications),
+      preferences: clampScore(breakdown.preferences)
+    },
+    market_evidence: clampText(role.market_evidence, 900),
+    market_sources: sources.flatMap((entry) => {
+      const index = Number((entry as Record<string, unknown>)?.source_index);
+      return Number.isInteger(index) && index >= 0 ? [{ source_index: index }] : [];
+    }).slice(0, 4),
+    success_signal: clampText(role.success_signal, 300)
+  };
+}
+
+/**
+ * Validates each opportunity on its own. One malformed entry used to fail the
+ * whole array through z.array, so a single mistyped dash in one role of ten
+ * discarded every other role and dropped the analysis onto its fallback.
+ */
+export function parseLooseRoles(value: unknown): { roles: GeneratedRole[]; dropped: number } | null {
+  const container = value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+  const list = Array.isArray(container?.roles) ? container.roles : Array.isArray(value) ? value : null;
+  if (!list) return null;
+  const roles: GeneratedRole[] = [];
+  let dropped = 0;
+  for (const entry of list) {
+    const parsed = generatedRoleSchema.safeParse(normalizeRole(entry));
+    if (parsed.success) roles.push(parsed.data);
+    else dropped += 1;
+  }
+  return { roles: roles.slice(0, 10), dropped };
+}

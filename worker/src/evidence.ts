@@ -249,14 +249,17 @@ export function weightedScore(breakdown: Record<string, number>): number {
 }
 
 export function groundRoles(roles: GeneratedRole[], sources: MarketSource[], dna: SanitizedDna, experience: string): GroundedRole[] {
-  const seenTitles = new Set<string>();
+  // Keyed on the posting, not its title. Four employers advertising "Accounting
+  // Clerk" are four openings a user can apply to; collapsing them by title threw
+  // most of a real match set away and pushed the analysis onto its fallback.
+  const seenPostings = new Set<string>();
   return roles.flatMap((role) => {
     const resolvedSources = role.market_sources.map(({ source_index }) => sources[source_index]).filter(Boolean);
     const primary = resolvedSources[0];
     if (!primary) return [];
-    const normalizedTitle = primary.title.toLowerCase();
-    if (seenTitles.has(normalizedTitle)) return [];
-    seenTitles.add(normalizedTitle);
+    const postingKey = (primary.url || `${primary.title}|${primary.employer}`).toLowerCase();
+    if (seenPostings.has(postingKey)) return [];
+    seenPostings.add(postingKey);
     const breakdown = scoreBreakdown(role.score_breakdown, dna);
     return [{
       ...role,

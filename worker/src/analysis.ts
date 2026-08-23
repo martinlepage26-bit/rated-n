@@ -4,6 +4,15 @@ import { ApiProblem } from './http';
 import { discoverMarketSources } from './market';
 import type { Env, MarketSource } from './types';
 
+/**
+ * Below this the result is too thin to be a comparison. It is deliberately not
+ * the 8-10 the prompt asks for: demanding the full set meant that losing one
+ * opportunity discarded every real, individually scored match in favour of the
+ * postings fallback, which repeats one templated entry at one constant score.
+ * Five genuine matches beat ten identical ones.
+ */
+const MIN_ROLES = 3;
+
 export type AnalysisOutcome =
   | { kind: 'empty'; dna: SanitizedDna; summary: string }
   | { kind: 'ready'; dna: SanitizedDna; roles: GroundedRole[] };
@@ -74,12 +83,13 @@ export async function matchRoles(env: Env, experience: string, dna: SanitizedDna
   try {
     const generated = await generateRoles(env, experience, dna, sources, region);
     const roles = groundRoles(generated.roles, sources, dna, experience);
-    if (roles.length >= 8) return roles.slice(0, 10);
+    if (roles.length >= MIN_ROLES) return roles.slice(0, 10);
+    console.error('match_roles_thin', roles.length);
   } catch (caught) {
     console.error('match_roles_model_failed', caught instanceof Error ? caught.message : String(caught));
   }
   const fromPostings = rolesFromPostings(sources, dna, experience);
-  if (fromPostings.length >= 8) return fromPostings;
+  if (fromPostings.length >= MIN_ROLES) return fromPostings;
   throw new ApiProblem(502, 'analysis_generation_failed', 'The analysis did not produce enough distinct current opportunities. Please try again.');
 }
 

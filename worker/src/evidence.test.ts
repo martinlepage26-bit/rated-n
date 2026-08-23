@@ -159,6 +159,25 @@ describe('groundRoles', () => {
     expect(grounded[0].market_sources[0]).toEqual({ title: source.title, employer: source.employer, location: source.location, url: source.url });
   });
 
+  it('keeps two employers advertising the same job title', () => {
+    // Four "Accounting Clerk" postings are four openings, not one duplicate.
+    const twin: MarketSource = { title: 'Program Manager', employer: 'Other Co', location: 'Toronto', url: 'https://www.linkedin.com/jobs/view/2' };
+    const dna = { ...emptyDna, transferable: [{ name: 'Delivery', evidence: 'I managed programs' }] };
+    const grounded = groundRoles(
+      [role, { ...role, market_sources: [{ source_index: 1 }] }],
+      [source, twin],
+      dna,
+      'I managed programs and coordinated delivery.'
+    );
+    expect(grounded).toHaveLength(2);
+    expect(grounded.map((entry) => entry.market_sources[0].employer)).toEqual(['Example Co', 'Other Co']);
+  });
+
+  it('still collapses two roles citing the same posting', () => {
+    const dna = { ...emptyDna, transferable: [{ name: 'Delivery', evidence: 'I managed programs' }] };
+    expect(groundRoles([role, { ...role, title: 'Different' }], [source], dna, 'I managed programs.')).toHaveLength(1);
+  });
+
   it('drops roles that cite a missing source index instead of fabricating them', () => {
     const dna = { ...emptyDna, transferable: [{ name: 'Delivery', evidence: 'I managed programs' }] };
     expect(groundRoles([{ ...role, market_sources: [{ source_index: 9 }] }], [source], dna, 'I managed programs.')).toEqual([]);
