@@ -4,6 +4,18 @@ Rated N turns a career narrative into a structured skills profile and compares t
 
 **Stack:** React, Vite, TypeScript, Cloudflare Workers, D1, Workflows, Workers AI, Vitest, and Playwright.
 
+## Workflow
+
+```mermaid
+flowchart TD
+  A["Career story"] --> B["Asynchronous analysis"]
+  B --> C["Evidence checks"]
+  C --> D["Supported capabilities"]
+  D --> E["Public role discovery and comparison"]
+  C --> F["Unsupported claims rejected"]
+  E --> G["Saved roles and application materials"]
+```
+
 ## Engineering highlights
 
 - Analysis runs asynchronously with explicit analyzing, ready, and failed states.
