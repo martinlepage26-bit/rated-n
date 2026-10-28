@@ -7,13 +7,12 @@ Rated N turns a career narrative into a structured skills profile and compares t
 ## Workflow
 
 ```mermaid
-flowchart TD
-  A["Career story"] --> B["Asynchronous analysis"]
+flowchart LR
+  A["Career story"] --> B["Async analysis"]
   B --> C["Evidence checks"]
-  C --> D["Supported capabilities"]
-  D --> E["Public role discovery and comparison"]
+  C --> D["Role discovery and comparison"]
   C --> F["Unsupported claims rejected"]
-  E --> G["Saved roles and application materials"]
+  D --> E["Saved roles and materials"]
 ```
 
 ## Engineering highlights
