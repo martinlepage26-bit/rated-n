@@ -1,87 +1,48 @@
-# Rated N
+# Rated N — Evidence-Grounded Career Analysis
 
-Rated N turns a user’s career story into evidence-backed Professional DNA, then compares that evidence with current public job listings. It includes private accounts, persistent career stories and roles, saved-path tracking, application status, and grounded résumé, cover-letter, and LinkedIn material generation. If the story has no defensible capability evidence, results stay empty. If the analysis engine fails, the profile is marked failed. Rated N does not invent capabilities, job titles, or match scores to keep the request alive. `POST /profiles/analyze` returns immediately with `status: analyzing`; the results page polls until the Workflow writes `ready` or `failed`.
+Rated N turns a career narrative into a structured skills profile and compares that evidence with public job listings. Users can save roles, track applications, and prepare application materials from the same source story.
 
-## Architecture
+**Stack:** React, Vite, TypeScript, Cloudflare Workers, D1, Workflows, Workers AI, Vitest, and Playwright.
 
-- React and Vite frontend on Cloudflare Pages
-- Same-origin Pages Function proxy at `/api`
-- Dedicated `rated-n-api` Cloudflare Worker
-- D1 for users, sessions, profiles, roles, and short-lived market cache
-- Workers AI structured output for analysis and application materials
-- Cloudflare Workflow (`rated-n-analysis`) for durable DNA extraction, market discovery, and role matching
-- Browser Run for current public-job discovery
-- HttpOnly, Secure, SameSite session cookies; PBKDF2 password hashing; hashed session, verification, and reset tokens
+## Engineering highlights
 
-Raw career stories stay inside Rated N and Cloudflare-hosted processing. Public job searches receive derived role titles and the user’s optional location, not the raw story.
+- Analysis runs asynchronously with explicit analyzing, ready, and failed states.
+- Evidence checks reject unsupported capability statements and avoid an artificial minimum match score.
+- Authentication and persisted user data live behind the API.
+- A coordinated release process checks that the frontend and API report the same revision.
 
-## Local checks
+## Review the implementation
 
-```bash
+| Question | Start here |
+| --- | --- |
+| How are generated claims checked against the story? | [Evidence logic](worker/src/evidence.ts), [regression tests](worker/src/evidence.test.ts) |
+| How does analysis move through its stages? | [Workflow](worker/src/workflow.ts) |
+| How are accounts handled? | [Authentication routes](worker/src/auth.ts) |
+| How is frontend/API version drift detected? | [Release](scripts/release.mjs), [verification](scripts/verify-release.mjs) |
+| How is the user journey checked? | [Browser tests](tests/app.spec.js) |
+
+For a focused review, compare a supported skill with a skill absent from the same synthetic career story. Then follow the asynchronous result to its source evidence.
+
+## Development and checks
+
+```sh
 npm install
+npm run dev
+```
+
+The frontend expects the configured Worker API. Full analysis additionally needs the Cloudflare bindings and remote Browser Run setup described in the operating guide.
+
+```sh
 npm run build
 npm test
 npm run lint
 npm run test:e2e
 ```
 
-`npm run dev` starts the frontend with `/api` proxied to a Worker on port 8788. Browser Run is a remote-only binding, so end-to-end analysis development should use Wrangler’s remote development support or a deployed preview.
+Use synthetic career stories and an isolated database for evaluation. Browser and provider-dependent checks need their documented environment.
 
-## Cloudflare setup
+## Scope
 
-Create the D1 database and replace its ID in `worker/wrangler.jsonc`, then apply migrations:
+Job matches and generated application materials are decision support. A source-backed statement is not independent verification of a person's experience. Missing evidence and analysis failures should remain visible instead of being filled with plausible claims.
 
-```bash
-npx wrangler d1 create rated-n-db
-npm run db:migrate:remote
-```
-
-Set the mandatory account-security secret:
-
-```bash
-npx wrangler secret put AUTH_PEPPER --config worker/wrangler.jsonc
-```
-
-For email registration, verification, and password reset, onboard Cloudflare Email Sending with a verified sender domain, add an `EMAIL` send-email binding to `worker/wrangler.jsonc`, and set `EMAIL_FROM` to the approved sender. The app reports email registration unavailable until both are present; it never pretends an email was sent.
-
-For Google sign-in, create a Google OAuth web client with this authorized redirect URI:
-
-```text
-https://rated-n.pages.dev/api/auth/google/callback
-```
-
-Then add both Worker secrets:
-
-```bash
-npx wrangler secret put GOOGLE_CLIENT_ID --config worker/wrangler.jsonc
-npx wrangler secret put GOOGLE_CLIENT_SECRET --config worker/wrangler.jsonc
-```
-
-## Releasing
-
-The Worker and the Pages site are two deployments that have to agree on the
-same request protocol, so Rated N ships them as one release rather than
-separately:
-
-```bash
-npm run release
-```
-
-That runs typecheck, tests and lint, builds the frontend, stamps the release
-commit into both halves, deploys the API before the site so the service binding
-resolves, and then refuses to report success unless the live `/release.json`
-and the live `/api/health` both report that commit.
-
-```bash
-npm run release:preview   # ship the current branch to a Pages preview
-npm run verify:release    # check the live halves are on the same commit
-```
-
-`npm run release` requires a clean working tree, because a release has to be
-reproducible from a commit; pass `--allow-dirty` to override deliberately.
-
-Deploying only one half is what breaks this app: when the API moved to an
-asynchronous analysis, production Pages kept serving a frontend that expected
-the result inline, and every analysis appeared to return nothing. Both halves
-were individually healthy, so nothing surfaced it. `verify:release` exists to
-make that state impossible to miss.
+[Detailed setup and operating guide](https://github.com/martinlepage26-bit/rated-n/blob/bdcc80f2a4166c1be2f6043a9cd4ac285787e10b/README.md)
